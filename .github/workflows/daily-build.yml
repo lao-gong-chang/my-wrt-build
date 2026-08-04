@@ -1,10 +1,11 @@
-name: Daily Build & Release
-run-name: Daily Build & Release
+name: Weekly Build & Release
+run-name: Weekly Build & Release
 
 on:
   schedule:
-    # 北京时间 03:00 = UTC 19:00
-    - cron: '0 19 * * *'
+    # 每周一北京时间 03:00 = UTC 周一 19:00
+    # 免费额度 2000 分钟/月，全量 4 台约 8-16h，每周一次最稳妥
+    - cron: '0 19 * * 1'
   workflow_dispatch:
     inputs:
       model:
