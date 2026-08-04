@@ -418,6 +418,13 @@ BUILD_DIR=$(read_ini_by_key "BUILD_DIR")
 COMMIT_HASH=$(read_ini_by_key "COMMIT_HASH")
 COMMIT_HASH=${COMMIT_HASH:-none}
 
+# 按设备读取自定义 LAN 地址（ini 可选配置），传递给 update.sh 覆盖默认 192.168.1.1
+LAN_ADDR_INI=$(read_ini_by_key "LAN_ADDR")
+if [[ -n $LAN_ADDR_INI ]]; then
+    export LAN_ADDR="$LAN_ADDR_INI"
+    echo "自定义 LAN 地址: $LAN_ADDR (设备 $Dev)"
+fi
+
 resolve_config_fragments
 
 if [[ $Build_Mod == "config_preview" ]]; then

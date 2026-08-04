@@ -24,7 +24,8 @@ FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
 GOLANG_BRANCH="26.x"
 THEME_SET="argon"
-LAN_ADDR="192.168.1.1"
+# 默认 LAN 地址，可被 build.sh 从设备 ini 的 LAN_ADDR 覆盖（export 传入）
+LAN_ADDR="${LAN_ADDR:-192.168.1.1}"
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 BASE_PATH=${BASE_PATH:-$SCRIPT_DIR}
