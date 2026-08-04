@@ -66,6 +66,13 @@ update_homeproxy() {
 
 
 update_lucky() {
+    # 如果本地自定义 lucky 包存在（wrt_core/custom_packages/lucky，如 3.0.0beta8），
+    # 跳过上游 gdy666 的 2.x 覆盖，保留我们的自定义版本。
+    if [ -f "$BASE_PATH/custom_packages/lucky/Makefile" ]; then
+        echo "检测到本地自定义 lucky 包 (custom_packages/lucky)，跳过上游 lucky 更新，保留自定义版本。"
+        return 0
+    fi
+
     local lucky_repo_url="https://github.com/gdy666/luci-app-lucky.git"
     local target_custom_feed_dir="$(get_custom_feed_worktree_dir)"
     local lucky_dir="$target_custom_feed_dir/lucky"
