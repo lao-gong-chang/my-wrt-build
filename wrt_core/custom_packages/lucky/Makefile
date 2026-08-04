@@ -60,8 +60,11 @@ endef
 
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
-	[ ! -f $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz ] && \
-		wget -q "$(LUCKY_DOWNLOAD_URL)" -O $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz
+	if [ ! -f $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz ]; then \
+		wget -q "$(LUCKY_DOWNLOAD_URL)" -O $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz || { \
+			echo "错误: lucky 下载失败 $(LUCKY_DOWNLOAD_URL)"; exit 1; \
+		}; \
+	fi
 	tar -xzf $(PKG_BUILD_DIR)/$(PKG_NAME)_$(PKG_VERSION)_Linux_$(LUCKY_ARCH).tar.gz -C $(PKG_BUILD_DIR)
 	chmod +x $(PKG_BUILD_DIR)/lucky
 endef
