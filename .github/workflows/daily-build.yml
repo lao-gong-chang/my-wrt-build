@@ -23,7 +23,8 @@ jobs:
       matrix:
         model:
           - jdcloud_ipq60xx_immwrt
-          - qihoo_360t7_immwrt
+          - qihoo_360t7-daed_immwrt
+          - qihoo_360t7-nikki_immwrt
           - x64_immwrt
     runs-on: ubuntu-24.04
 
