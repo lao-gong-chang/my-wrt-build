@@ -162,7 +162,7 @@ install_custom_feed() {
         v2dat adguardhome luci-app-adguardhome ddns-go \
         luci-app-ddns-go taskd luci-lib-xterm luci-lib-taskd luci-app-store quickstart \
         luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest netdata luci-app-netdata \
-        lucky luci-app-lucky luci-app-openclash luci-app-homeproxy luci-app-amlogic \
+        luci-app-openclash luci-app-homeproxy luci-app-amlogic \
         oaf open-app-filter luci-app-oaf easytier luci-app-easytier \
         msd_lite luci-app-msd_lite cups luci-app-cupsd
     )
@@ -170,7 +170,7 @@ install_custom_feed() {
         cups tcping v2ray-geodata luci-lib-taskd luci-app-openclash
         luci-app-quickstart luci-app-store luci-app-homeproxy luci-app-mosdns
         luci-app-passwall nikki luci-app-nikki mihomo-meta
-        open-app-filter luci-app-oaf lucky luci-app-lucky luci-app-easytier
+        open-app-filter luci-app-oaf lucky luci-app-easytier
         luci-app-emmc-health
     )
     local custom_feed_sources=()
@@ -195,6 +195,7 @@ install_custom_feed() {
         "sbwml/luci-app-mosdns|https://github.com/sbwml/luci-app-mosdns.git|v5|mosdns luci-app-mosdns"
         "Openwrt-Passwall/openwrt-passwall|https://github.com/Openwrt-Passwall/openwrt-passwall.git|main|luci-app-passwall"
         "nikkinikki-org/OpenWrt-nikki|https://github.com/nikkinikki-org/OpenWrt-nikki.git|main|nikki luci-app-nikki mihomo-meta"
+        "kenzok8/small-package-daed|https://github.com/kenzok8/small-package.git||dae daed luci-app-daed"
     )
 
     feeds_path=$(get_feeds_path)
@@ -226,6 +227,23 @@ install_custom_feed() {
     if ! fix_emmc_health_luci_js_deps "$custom_feed_dir/luci-app-emmc-health"; then
         rm -rf "$custom_feed_dir"
         return 1
+    fi
+
+    # 同步本地自定义包（wrt_core/custom_packages/*），覆盖外部源的同名包。
+    # 当前用于 Lucky 3.0.0beta8（官方 3.x 系列不在 GitHub 发布，需从 release.66666.host 拉取）。
+    local custom_packages_root="$BASE_PATH/custom_packages"
+    if [ -d "$custom_packages_root" ]; then
+        local pkg_dir
+        local pkg_name
+        for pkg_dir in "$custom_packages_root"/*/; do
+            [ -d "$pkg_dir" ] || continue
+            pkg_name=$(basename "$pkg_dir")
+            if [ -f "$pkg_dir/Makefile" ]; then
+                rm -rf "$custom_feed_dir/$pkg_name"
+                cp -r "$pkg_dir" "$custom_feed_dir/$pkg_name"
+                echo "已同步本地自定义包: $pkg_name"
+            fi
+        done
     fi
 
     register_local_feed_source "$custom_feed_dir" "$feeds_path"

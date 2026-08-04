@@ -20,6 +20,7 @@ on:
           - link_nn6000v2_immwrt
           - linksys_mx4x00_immwrt
           - n1_immwrt
+          - qihoo_360t7_immwrt
           - qihoo_360v6_immwrt
           - redmi_ax5_immwrt
           - redmi_ax6_immwrt

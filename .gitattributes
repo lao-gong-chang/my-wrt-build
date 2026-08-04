@@ -1,0 +1,10 @@
+* text=auto
+
+# Shell / 编译脚本强制 LF（GitHub Actions 在 Linux 上运行，CRLF 会导致执行失败）
+*.sh text eol=lf
+*.init text eol=lf
+Makefile text eol=lf
+*.config text eol=lf
+*.ini text eol=lf
+*.yml text eol=lf
+*.patch text eol=lf

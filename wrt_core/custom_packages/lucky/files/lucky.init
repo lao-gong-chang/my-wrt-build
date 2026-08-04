@@ -1,0 +1,26 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+
+USE_PROCD=1
+
+LUCKY_BIN=/usr/bin/lucky
+LUCKY_CFG=/etc/lucky
+LUCKY_PORT=16601
+
+start_service() {
+    [ -x "$LUCKY_BIN" ] || return 1
+    [ -d "$LUCKY_CFG" ] || mkdir -p "$LUCKY_CFG"
+
+    procd_open_instance
+    procd_set_param command "$LUCKY_BIN"
+    procd_append_param command -cd "$LUCKY_CFG"
+    procd_set_param respawn 3600 5 5
+    procd_set_param file "$LUCKY_CFG/lucky.conf"
+    procd_close_instance
+}
+
+stop_service() {
+    procd_kill "$LUCKY_BIN" 2>/dev/null || true
+}
