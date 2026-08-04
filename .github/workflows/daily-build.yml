@@ -1,5 +1,5 @@
 name: Daily Build & Release
-run-name: Daily Build - ${{ matrix.model }}
+run-name: Daily Build & Release
 
 on:
   schedule:
