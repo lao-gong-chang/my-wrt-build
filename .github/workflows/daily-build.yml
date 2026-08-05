@@ -18,6 +18,11 @@ on:
         description: Retry attempt number (internal)
         type: string
         default: "1"
+      no_chain:
+        required: false
+        description: Single-device mode (true = build only this device, no auto chain/retry)
+        type: string
+        default: ""
 
 # 云端自驱动链需要 actions:write（触发下一台/重试）+ contents:write（发布 Release）
 permissions:
@@ -206,7 +211,7 @@ jobs:
 
       # ===== 云端自驱动链：成功→自动触发下一台；失败→智能重试（仅网络/瞬时错误，最多 2 次）=====
       - name: Dispatch Next Device (chain)
-        if: ${{ success() && steps.skip.outputs.skip == 'false' && inputs.model != '' }}
+        if: ${{ success() && steps.skip.outputs.skip == 'false' && inputs.model != '' && inputs.no_chain != 'true' }}
         shell: bash
         run: |
           NEXT=""
@@ -217,7 +222,7 @@ jobs:
           esac
           if [ -n "$NEXT" ]; then
             echo "==> ${{ matrix.model }} 编译成功，链式触发下一台: $NEXT"
-            gh workflow run daily-build.yml -f model="$NEXT" -f attempt=1 --repo "$GITHUB_REPOSITORY"
+            gh workflow run daily-build.yml -f model="$NEXT" -f attempt=1 -f no_chain=true --repo "$GITHUB_REPOSITORY"
           else
             echo "==> 全部 4 台设备编译完成！本轮结束"
           fi
@@ -233,11 +238,11 @@ jobs:
           if [ ! -f build_log.txt ]; then
             # 失败发生在编译开始前（clone/下载阶段）→ 多为网络问题，重试
             echo "==> 编译早期失败（无构建日志），判定为网络/环境问题，自动重试 attempt $(( ${{ inputs.attempt }} + 1 ))/2"
-            gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$(( ${{ inputs.attempt }} + 1 ))" --repo "$GITHUB_REPOSITORY"
+            gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$(( ${{ inputs.attempt }} + 1 ))" -f no_chain=true --repo "$GITHUB_REPOSITORY"
           elif grep -qiE "$DETERMINISTIC_PATTERN" build_log.txt && ! grep -qiE "$NETWORK_PATTERN" build_log.txt; then
             echo "==> 确定性错误（依赖/编译/配置问题），自动重试无法修复，停止本轮"
             echo "==> 已通过 GitHub 邮件通知，修复代码/配置后重新触发即可"
           else
             echo "==> 网络/瞬时错误或日志无法分类，自动重试 attempt $(( ${{ inputs.attempt }} + 1 ))/2（走缓存增量续编）"
-            gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$(( ${{ inputs.attempt }} + 1 ))" --repo "$GITHUB_REPOSITORY"
+            gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$(( ${{ inputs.attempt }} + 1 ))" -f no_chain=true --repo "$GITHUB_REPOSITORY"
           fi
