@@ -13,6 +13,16 @@ on:
         description: Device model (empty = all)
         type: string
         default: ""
+      attempt:
+        required: false
+        description: Retry attempt number (internal)
+        type: string
+        default: "1"
+
+# 云端自驱动链需要 actions:write（触发下一台/重试）+ contents:write（发布 Release）
+permissions:
+  contents: write
+  actions: write
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -28,17 +38,28 @@ jobs:
           - qihoo_360t7-nikki_immwrt
           - x64_immwrt
     runs-on: ubuntu-24.04
+    timeout-minutes: 420
 
     steps:
       - name: Skip check for workflow_dispatch model filter
         id: skip
         shell: bash
         run: |
-          if [[ -n "${{ inputs.model }}" && "${{ inputs.model }}" != "${{ matrix.model }}" ]]; then
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # 定时触发只负责发起串行链，本 run 不做实际编译（避免 4 台并行）
+            echo "skip=true" >> $GITHUB_OUTPUT
+          elif [[ -n "${{ inputs.model }}" && "${{ inputs.model }}" != "${{ matrix.model }}" ]]; then
             echo "skip=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Schedule Entry (chain start)
+        if: ${{ github.event_name == 'schedule' && matrix.model == 'jdcloud_ipq60xx_immwrt' }}
+        shell: bash
+        run: |
+          echo "每周定时轮次开始，从 AX6600 发起串行链"
+          gh workflow run daily-build.yml -f model=jdcloud_ipq60xx_immwrt -f attempt=1 --repo "$GITHUB_REPOSITORY"
 
       - name: Free Disk Space
         if: steps.skip.outputs.skip == 'false'
@@ -164,6 +185,7 @@ jobs:
       # 下次 run 恢复后只重编缺失包（约 20-40 分钟），避免失败=全量重编（约 2.5h）烧额度
       - name: Prune Old Cache
         if: ${{ !cancelled() && steps.skip.outputs.skip == 'false' }}
+        continue-on-error: true
         shell: bash
         run: |
           gh cache list --key "${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}-" --json key --jq '.[].key' | while read -r key; do
@@ -179,3 +201,29 @@ jobs:
             ./action_build/.ccache
             ./action_build/staging_dir
           key: ${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+
+      # ===== 云端自驱动链：成功→自动触发下一台；失败→自动重试（最多 3 次）=====
+      - name: Dispatch Next Device (chain)
+        if: ${{ success() && steps.skip.outputs.skip == 'false' && inputs.model != '' }}
+        shell: bash
+        run: |
+          NEXT=""
+          case "${{ matrix.model }}" in
+            jdcloud_ipq60xx_immwrt)     NEXT="qihoo_360t7-nikki_immwrt" ;;
+            qihoo_360t7-nikki_immwrt)   NEXT="qihoo_360t7-daed_immwrt" ;;
+            qihoo_360t7-daed_immwrt)    NEXT="x64_immwrt" ;;
+          esac
+          if [ -n "$NEXT" ]; then
+            echo "==> ${{ matrix.model }} 编译成功，链式触发下一台: $NEXT"
+            gh workflow run daily-build.yml -f model="$NEXT" -f attempt=1 --repo "$GITHUB_REPOSITORY"
+          else
+            echo "==> 全部 4 台设备编译完成！本轮结束"
+          fi
+
+      - name: Auto Retry on Failure
+        if: ${{ failure() && steps.skip.outputs.skip == 'false' && inputs.model != '' && inputs.attempt < '3' }}
+        shell: bash
+        run: |
+          ATTEMPT=$(( ${{ inputs.attempt }} + 1 ))
+          echo "==> ${{ matrix.model }} 编译失败 (attempt ${{ inputs.attempt }}/3)，自动重试，将走缓存增量续编"
+          gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$ATTEMPT" --repo "$GITHUB_REPOSITORY"
