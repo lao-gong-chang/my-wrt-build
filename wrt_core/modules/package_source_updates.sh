@@ -252,6 +252,8 @@ update_argon() {
         exit 1
     fi
 
+    # 父目录可能不存在(feeds/luci 未完整同步时), 先创建再 mv, 避免 mv 报 No such file or directory 中断整个构建
+    mkdir -p "$(dirname "$dst_theme_path")"
     rm -rf "$dst_theme_path"
     rm -rf "$tmp_dir/.git"
     mv "$tmp_dir" "$dst_theme_path"
