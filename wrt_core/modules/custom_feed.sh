@@ -61,7 +61,9 @@ sync_sparse_packages_to_feed_dir() {
     for pkg in "${packages[@]}"; do
         if [ -d "$tmp_dir/$pkg" ]; then
             rm -rf "$target_dir/$pkg"
-            mv "$tmp_dir/$pkg" "$target_dir/"
+            # 支持多级路径（如 net/daed）：先确保目标父目录存在
+            mkdir -p "$(dirname "$target_dir/$pkg")"
+            mv "$tmp_dir/$pkg" "$target_dir/$pkg"
         else
             missing_packages+=("$pkg")
         fi
@@ -164,14 +166,15 @@ install_custom_feed() {
         luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest netdata luci-app-netdata \
         luci-app-openclash luci-app-homeproxy luci-app-amlogic \
         oaf open-app-filter luci-app-oaf easytier luci-app-easytier \
-        msd_lite luci-app-msd_lite cups luci-app-cupsd
+        msd_lite luci-app-msd_lite cups luci-app-cupsd \
+        dae luci-app-daed
     )
     local required_feed_dirs=(
         cups tcping v2ray-geodata luci-lib-taskd luci-app-openclash
         luci-app-quickstart luci-app-store luci-app-homeproxy luci-app-mosdns
         luci-app-passwall nikki luci-app-nikki mihomo-meta
         open-app-filter luci-app-oaf lucky luci-app-easytier
-        luci-app-emmc-health
+        luci-app-emmc-health net/daed
     )
     local custom_feed_sources=()
     local missing_feed_dirs=()
@@ -195,7 +198,9 @@ install_custom_feed() {
         "sbwml/luci-app-mosdns|https://github.com/sbwml/luci-app-mosdns.git|v5|mosdns luci-app-mosdns"
         "Openwrt-Passwall/openwrt-passwall|https://github.com/Openwrt-Passwall/openwrt-passwall.git|main|luci-app-passwall"
         "nikkinikki-org/OpenWrt-nikki|https://github.com/nikkinikki-org/OpenWrt-nikki.git|main|nikki luci-app-nikki mihomo-meta"
-        "kenzok8/small-package-daed|https://github.com/kenzok8/small-package.git||dae daed luci-app-daed"
+        # daed 官方源：一个 Makefile 包含 daed + daed-geoip + daed-geosite 三个包，
+        # 不依赖 vmlinux-btf（small-package 版本依赖 vmlinux-btf 导致 install 失败）
+        "immortalwrt/packages-daed|https://github.com/immortalwrt/packages.git|master|net/daed"
     )
 
     feeds_path=$(get_feeds_path)
