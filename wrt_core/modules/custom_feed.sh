@@ -224,6 +224,17 @@ install_custom_feed() {
         fi
     done
 
+    # 修复官方 net/daed Makefile 的相对路径 include：
+    # 官方仓库里 `include ../../lang/golang/golang-package.mk` 解析为
+    # packages/lang/golang/golang-package.mk；复制到 custom_feed/net/daed 后
+    # 相对路径失效导致 "ERROR: please fix .../net/daed/Makefile"（daed 包注册失败）。
+    # 改为绝对路径引用 packages feed 的 golang 包（feeds update -a 后必存在）。
+    local daed_makefile="$custom_feed_dir/net/daed/Makefile"
+    if [ -f "$daed_makefile" ]; then
+        sed -i 's|include ../../lang/golang/golang-package.mk|include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk|' "$daed_makefile"
+        echo "已修正 net/daed Makefile 的 golang include 相对路径 -> \$(TOPDIR)/feeds/packages/lang/golang/golang-package.mk"
+    fi
+
     if ! sync_repo_root_package_to_feed_dir "https://github.com/adminchenyu/eMMC-Health.git" "main" "$custom_feed_dir" "adminchenyu/eMMC-Health" "luci-app-emmc-health"; then
         rm -rf "$custom_feed_dir"
         return 1
