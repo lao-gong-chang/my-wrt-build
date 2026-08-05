@@ -128,7 +128,9 @@ jobs:
 
       - name: Build Firmware
         if: steps.skip.outputs.skip == 'false'
-        run: ./build.sh ${{ matrix.model }}
+        run: |
+          # 日志落盘：供 Auto Retry 步骤做错误分类（网络类才重试，确定性错误不重试）
+          ./build.sh ${{ matrix.model }} 2>&1 | tee build_log.txt
 
       - name: Get Kernel Version
         if: steps.skip.outputs.skip == 'false'
@@ -202,7 +204,7 @@ jobs:
             ./action_build/staging_dir
           key: ${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
 
-      # ===== 云端自驱动链：成功→自动触发下一台；失败→自动重试（最多 3 次）=====
+      # ===== 云端自驱动链：成功→自动触发下一台；失败→智能重试（仅网络/瞬时错误，最多 2 次）=====
       - name: Dispatch Next Device (chain)
         if: ${{ success() && steps.skip.outputs.skip == 'false' && inputs.model != '' }}
         shell: bash
@@ -220,10 +222,22 @@ jobs:
             echo "==> 全部 4 台设备编译完成！本轮结束"
           fi
 
-      - name: Auto Retry on Failure
-        if: ${{ failure() && steps.skip.outputs.skip == 'false' && inputs.model != '' && inputs.attempt < '3' }}
+      - name: Auto Retry on Failure (smart)
+        if: ${{ failure() && steps.skip.outputs.skip == 'false' && inputs.model != '' && inputs.attempt < '2' }}
         shell: bash
         run: |
-          ATTEMPT=$(( ${{ inputs.attempt }} + 1 ))
-          echo "==> ${{ matrix.model }} 编译失败 (attempt ${{ inputs.attempt }}/3)，自动重试，将走缓存增量续编"
-          gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$ATTEMPT" --repo "$GITHUB_REPOSITORY"
+          # 智能重试：只对「网络/瞬时错误」重试（重试可修复）；
+          # 依赖缺失/编译错误等确定性错误重试无用，直接停止等待人工修复，避免浪费额度
+          DETERMINISTIC_PATTERN='cannot find dependency|recursive dependency|No rule to make target|No such file or directory|Error [1-9][0-9]*$|make: \*\*\*|failed to build|package/.*Error|unable to install|dependenc.*not satisfied|incompatible with the architectures'
+          NETWORK_PATTERN='timed? ?out|connection (reset|refused|closed|timed out)|could not resolve|cannot resolve|fetch (failed|error)|curl: \(|wget: (unable|cannot)|read timeout|network is unreachable|temporary failure|no route to host|ssl (error|handshake)|peer reset|HTTP 404|404 Not Found|Repository not found'
+          if [ ! -f build_log.txt ]; then
+            # 失败发生在编译开始前（clone/下载阶段）→ 多为网络问题，重试
+            echo "==> 编译早期失败（无构建日志），判定为网络/环境问题，自动重试 attempt $(( ${{ inputs.attempt }} + 1 ))/2"
+            gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$(( ${{ inputs.attempt }} + 1 ))" --repo "$GITHUB_REPOSITORY"
+          elif grep -qiE "$DETERMINISTIC_PATTERN" build_log.txt && ! grep -qiE "$NETWORK_PATTERN" build_log.txt; then
+            echo "==> 确定性错误（依赖/编译/配置问题），自动重试无法修复，停止本轮"
+            echo "==> 已通过 GitHub 邮件通知，修复代码/配置后重新触发即可"
+          else
+            echo "==> 网络/瞬时错误或日志无法分类，自动重试 attempt $(( ${{ inputs.attempt }} + 1 ))/2（走缓存增量续编）"
+            gh workflow run daily-build.yml -f model="${{ matrix.model }}" -f attempt="$(( ${{ inputs.attempt }} + 1 ))" --repo "$GITHUB_REPOSITORY"
+          fi
