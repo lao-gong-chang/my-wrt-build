@@ -41,6 +41,7 @@ jobs:
           - jdcloud_ipq60xx_immwrt
           - jdcloud_ipq60xx_libwrt
           - qihoo_360t7-daed_immwrt
+          - qihoo_360t7-daed_openwrt
           - qihoo_360t7-nikki_immwrt
           - qihoo_360t7-nikki_openwrt
           - x64_immwrt
