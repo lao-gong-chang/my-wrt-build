@@ -42,7 +42,9 @@ jobs:
           - jdcloud_ipq60xx_libwrt
           - qihoo_360t7-daed_immwrt
           - qihoo_360t7-nikki_immwrt
+          - qihoo_360t7-nikki_openwrt
           - x64_immwrt
+          - x64_openwrt
     runs-on: ubuntu-24.04
     timeout-minutes: 420
 
