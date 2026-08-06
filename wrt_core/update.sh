@@ -115,6 +115,7 @@ stage_pre_install_source_fixes() {
     fix_easytier_mk
     remove_attendedsysupgrade
     fix_kconfig_recursive_dependency
+    fix_bpf_kconfig_symbols
 }
 
 stage_feeds_install() {

@@ -53,6 +53,19 @@ fix_kconfig_recursive_dependency() {
 }
 
 
+fix_bpf_kconfig_symbols() {
+    # 【方案 B - 治本式】让 HAS_BPF_TOOLCHAIN 恒为 y：
+    # toolchain/Config.in 原定义 `default y if !BPF_TOOLCHAIN_NONE` 依赖 choice 状态，
+    # 实测即使 .config 写入 CONFIG_HAS_BPF_TOOLCHAIN=y，Kconfig 计算 daed 依赖时仍不生效。
+    # 改为无条件 default y，daed 的原始 `depends on HAS_BPF_TOOLCHAIN` 即真正满足。
+    local file="$BUILD_DIR/toolchain/Config.in"
+    if [ -f "$file" ]; then
+        sed -i 's|default y if !BPF_TOOLCHAIN_NONE|default y|' "$file"
+        echo "已修复 toolchain/Config.in: HAS_BPF_TOOLCHAIN 无条件 default y(方案B治本式)"
+    fi
+}
+
+
 update_default_lan_addr() {
     local CFG_PATH="$BUILD_DIR/package/base-files/files/bin/config_generate"
     if [ -f $CFG_PATH ]; then

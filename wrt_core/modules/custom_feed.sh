@@ -232,14 +232,12 @@ install_custom_feed() {
     local daed_makefile="$custom_feed_dir/net/daed/Makefile"
     if [ -f "$daed_makefile" ]; then
         sed -i 's|include ../../lang/golang/golang-package.mk|include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk|' "$daed_makefile"
-        # 关键修复1: 移除 +kmod-xdp-sockets-diag 硬依赖（内核未开 XDP_SOCKETS 时该 kmod 被丢弃 → daed 连带被丢）
+        # 修复: 移除 +kmod-xdp-sockets-diag 硬依赖（内核未开 XDP_SOCKETS 时该 kmod 被丢弃 → daed 连带被丢）
         sed -i 's|+kmod-xdp-sockets-diag||g' "$daed_makefile"
-        # 关键修复2: 移除 $(BPF_DEPENDS)（展开为 depends on HAS_BPF_TOOLCHAIN）。
-        # 实测: VIKINGYFY/immortalwrt 中即使 CONFIG_HAS_BPF_TOOLCHAIN=y 写入 .config，
-        # Kconfig 计算 daed 依赖时该符号仍不生效(与 toolchain/Config.in 的 choice 默认值交互问题)，
-        # 导致 daed 永远被静默跳过。编译期 clang 由 CONFIG_USE_LLVM_HOST=y 保证(已生效)。
-        sed -i 's|DEPENDS:=$(GO_ARCH_DEPENDS) $(BPF_DEPENDS)|DEPENDS:=$(GO_ARCH_DEPENDS)|' "$daed_makefile"
-        echo "已修正 net/daed Makefile: golang include 绝对路径 + 移除 xdp-sockets-diag + 移除 BPF_DEPENDS(depends on HAS_BPF_TOOLCHAIN 不生效)"
+        # 【方案 B - 治本式】保留 daed 的 $(BPF_DEPENDS)(depends on HAS_BPF_TOOLCHAIN) 不裁剪，
+        # 通过 fix_bpf_kconfig_symbols 修复 toolchain/Config.in 使 HAS_BPF_TOOLCHAIN 恒为 y，
+        # daed 的原始依赖链完整保留(与方案A"移除依赖绕开"形成对比验证)。
+        echo "已修正 net/daed Makefile: golang include 绝对路径 + 移除 xdp-sockets-diag(保留 BPF_DEPENDS, 方案B治本式)"
     fi
 
     if ! sync_repo_root_package_to_feed_dir "https://github.com/adminchenyu/eMMC-Health.git" "main" "$custom_feed_dir" "adminchenyu/eMMC-Health" "luci-app-emmc-health"; then
