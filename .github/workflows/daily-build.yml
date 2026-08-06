@@ -79,10 +79,15 @@ jobs:
           sudo rm -rf /usr/local/.ghcup || true
           sudo rm -rf /usr/share/swift || true
           sudo rm -rf "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}" || true
+          sudo rm -rf /root/.cache/pip /root/.cargo /root/.rustup || true
+          sudo rm -rf /usr/local/lib/node_modules /usr/local/share/powershell || true
           docker system prune -af || true
           sudo -E apt-get autoremove --purge -y || true
           sudo -E apt-get clean || true
+          # 确保 /tmp 不残留上次构建
+          sudo rm -rf /tmp/* 2>/dev/null || true
           df -hT
+          echo "磁盘清理完成，可用空间如上（GitHub ubuntu-24.04 runner 默认 145G 盘，清理后通常 >100G 可用）"
 
       - name: Build System Setup
         if: steps.skip.outputs.skip == 'false'
@@ -135,6 +140,25 @@ jobs:
             find "./action_build/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r dir; do
                 find "$dir" -type f -exec touch {} +
             done
+          fi
+
+      - name: Disk Pre-check (protect build)
+        if: steps.skip.outputs.skip == 'false'
+        shell: bash
+        run: |
+          # OpenWrt 全量编译峰值 ~20-25G（含 docker 全家桶），预留 <25G 时主动清理 dl_shared
+          avail_gb=$(df -BG / | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+          echo "构建前可用磁盘: ${avail_gb}G"
+          if [ "${avail_gb:-0}" -lt 25 ]; then
+            echo "磁盘不足 25G，清理 dl_shared / dl 缓存..."
+            rm -rf ./action_build/dl ./action_build/dl_shared ./dl_shared 2>/dev/null || true
+            rm -rf ./action_build/staging_dir/target-* 2>/dev/null || true
+            avail_gb=$(df -BG / | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+            echo "清理后可用: ${avail_gb}G"
+          fi
+          if [ "${avail_gb:-0}" -lt 15 ]; then
+            echo "::error::磁盘仍不足 15G，构建可能失败（docker 全家桶需要 ~20G+），请检查 runner"
+            exit 1
           fi
 
       - name: Build Firmware
@@ -194,8 +218,22 @@ jobs:
           fail_on_unmatched_files: true
           body_path: ./release_body.txt
 
-      # 失败也保存缓存：OpenWrt 增量编译只需 staging_dir(toolchain+产物)+.ccache，
+      # 失败也保存缓存：OpenWrt 增量编译只需 staging_dir(toolchain)+.ccache，
       # 下次 run 恢复后只重编缺失包（约 20-40 分钟），避免失败=全量重编（约 2.5h）烧额度
+      # ⚠️ 缓存瘦身：删除 target-* 产物（可重建，占 1-2G），只留 toolchain + ccache，
+      #    避免 8 台设备缓存撑爆 GitHub 10GB/仓库上限被 LRU 淘汰（淘汰=增量失效=全量重编）
+      - name: Slim Cache Before Save
+        if: ${{ !cancelled() && steps.skip.outputs.skip == 'false' }}
+        shell: bash
+        run: |
+          # 只保留 toolchain 与 host 工具，删除可重建的 target 包产物
+          find ./action_build/staging_dir -maxdepth 1 -type d -name "target-*" -exec rm -rf {} + 2>/dev/null || true
+          # 删除 build_dir 中间产物（不缓存）
+          rm -rf ./action_build/build_dir 2>/dev/null || true
+          # 统计缓存体积
+          echo "缓存体积:"
+          du -sh ./action_build/.ccache ./action_build/staging_dir 2>/dev/null || true
+
       - name: Prune Old Cache
         if: ${{ !cancelled() && steps.skip.outputs.skip == 'false' }}
         continue-on-error: true
