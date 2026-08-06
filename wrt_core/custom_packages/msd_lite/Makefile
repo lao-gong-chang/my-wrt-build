@@ -42,6 +42,10 @@ define Package/msd_lite/conffiles
 /etc/msd_lite/msd_lite.conf
 endef
 
+# 2026-08-06 二次修复: 上游 CMakeLists install(CODE "FILE(MAKE_DIRECTORY ${CONFDIR})")
+# 对绝对路径 CONFDIR=/etc/msd_lite 不走 DESTDIR 前缀, runner /etc 只读 -> Permission denied
+# (download hash 修复后暴露的编译期 bug)。patches/001-fix-install-dir.patch 将其改为
+# install(DIRECTORY DESTINATION ...) 受 DESTDIR 控制; /etc/msd_lite 内容由下方 install 段负责
 CMAKE_OPTIONS += \
 	-DCONFDIR=/etc/msd_lite
 

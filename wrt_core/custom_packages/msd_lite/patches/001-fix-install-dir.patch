@@ -1,0 +1,10 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -259,7 +259,7 @@
+ ##################### INSTALLATION #####################################
+ 
+ # Configs
+-install(CODE "FILE(MAKE_DIRECTORY ${CONFDIR})")
++install(DIRECTORY DESTINATION "${CONFDIR}")
+ 
+ install_if_not_exists(conf/msd_lite.conf ${CONFDIR} "msd_lite.conf" ".sample")
